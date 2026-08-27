@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Polymarket Whale Tracker{% endblock %}</title>
+<script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, -apple-system, sans-serif; background: #0f0f0f; color: #d4d4d4; font-size: 14px; line-height: 1.5; }
+a { color: #7eb8f7; text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+nav { background: #161616; border-bottom: 1px solid #2a2a2a; padding: 12px 24px; display: flex; gap: 24px; align-items: center; }
+nav .brand { color: #fff; font-weight: 700; font-size: 15px; }
+nav a { color: #999; font-size: 13px; }
+nav a:hover { color: #fff; text-decoration: none; }
+
+main { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
+h1 { font-size: 20px; font-weight: 700; color: #fff; margin-bottom: 20px; }
+h2 { font-size: 15px; font-weight: 600; color: #ccc; margin-bottom: 12px; }
+
+section { margin-bottom: 36px; }
+
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; padding: 8px 12px; background: #161616; color: #777; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; border-bottom: 1px solid #2a2a2a; white-space: nowrap; }
+th a { color: #777; font-weight: 600; }
+th a:hover { color: #aaa; text-decoration: none; }
+td { padding: 9px 12px; border-bottom: 1px solid #1e1e1e; vertical-align: top; }
+tr:hover td { background: #141414; }
+
+.badge { display: inline-block; padding: 2px 7px; border-radius: 3px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; }
+.badge-high   { background: #3d0000; color: #ff7070; }
+.badge-medium { background: #2d1f00; color: #ffb347; }
+.badge-low    { background: #0a1e0a; color: #6dce79; }
+.badge-sent   { background: #0a1e28; color: #4fc3f7; }
+.badge-unsent { background: #282020; color: #888; }
+.badge-informed { background: #0d2040; color: #5bc0f8; }
+.badge-sharp    { background: #1a1000; color: #f0a030; }
+.badge-farmer { background: #1f2800; color: #a8cc00; }
+.badge-sybil  { background: #2a0030; color: #cc88ff; }
+.badge-watch  { background: #1a1000; color: #f5c542; }
+
+.mono { font-family: ui-monospace, "Cascadia Code", monospace; font-size: 12px; }
+.muted { color: #555; }
+.empty { color: #555; font-style: italic; padding: 20px 0; }
+
+.card { background: #161616; border: 1px solid #2a2a2a; border-radius: 6px; padding: 20px; margin-bottom: 16px; }
+.meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.meta-item label { display: block; font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 3px; }
+.meta-item span { color: #d4d4d4; }
+
+.filter-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
+.filter-bar input, .filter-bar select {
+  background: #0f0f0f; color: #d4d4d4; border: 1px solid #2a2a2a; border-radius: 4px;
+  padding: 5px 10px; font-size: 13px;
+}
+.filter-bar button {
+  background: #1e3a5f; color: #7eb8f7; border: none; border-radius: 4px;
+  padding: 5px 14px; cursor: pointer; font-size: 13px;
+}
+.filter-bar button:hover { background: #254d7a; }
+
+.pager { display: flex; gap: 6px; align-items: center; }
+.pager a, .pager span {
+  background: #1a1a1a; color: #7eb8f7; border: 1px solid #2a2a2a;
+  border-radius: 4px; padding: 4px 12px; font-size: 12px; text-decoration: none;
+}
+.pager span { color: #444; }
+</style>
+</head>
+<body>
+<nav>
+  <span class="brand">Whale Tracker</span>
+  <a href="/">Dashboard</a>
+  <a href="/markets">Markets</a>
+  <a href="/wallets">Wallets</a>
+  <a href="/rankings">Rankings</a>
+  <a href="/alerts">Alert Log</a>
+  <a href="/analytics">Analytics</a>
+</nav>
+<main>
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>

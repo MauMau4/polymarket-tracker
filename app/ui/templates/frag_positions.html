@@ -1,0 +1,83 @@
+{% set p = pagination %}
+{% if p.total_pages > 1 %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+  <span class="muted" style="font-size:12px;">
+    Showing {{ p.offset + 1 }}–{{ [p.offset + p.page_size, p.total] | min }} of {{ p.total }}
+  </span>
+  <div class="pager">
+    {% if p.ajax_prev_url %}<a href="{{ p.prev_url }}" data-ajax-table="positions" data-ajax-url="{{ p.ajax_prev_url }}">← Prev</a>{% else %}<span>← Prev</span>{% endif %}
+    <span style="background:none;border:none;color:#666;">{{ p.page }} / {{ p.total_pages }}</span>
+    {% if p.ajax_next_url %}<a href="{{ p.next_url }}" data-ajax-table="positions" data-ajax-url="{{ p.ajax_next_url }}">Next →</a>{% else %}<span>Next →</span>{% endif %}
+  </div>
+</div>
+{% endif %}
+{% if wallet_positions %}
+<table>
+  <thead>
+    <tr>
+      <th rowspan="2">Market</th>
+      <th rowspan="2">Selection</th>
+      <th rowspan="2" title="Remaining open shares">Shares</th>
+      <th rowspan="2" title="Volume-weighted average entry price">Avg Price</th>
+      <th colspan="2" style="text-align:center;border-bottom:none" title="Original: total_shares_bought × avg_entry | Current: remaining × avg_entry"><div style="display:inline-block;border-bottom:1px solid currentColor;width:65%;margin:0 auto;">Cost Basis</div></th>
+      <th rowspan="2" title="Realized profit/loss from closed portions">Realized PnL</th>
+      <th rowspan="2" title="ROI on closed positions only: realized_pnl / original_cost_basis">ROI</th>
+      <th rowspan="2">Status</th>
+    </tr>
+    <tr>
+      <th title="total_shares_bought × avg_entry_price">Original</th>
+      <th title="remaining_shares × avg_entry_price">Current</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for pos in wallet_positions %}
+    {% set pos_missing = pos.avg_entry_price == 0.0 %}
+    {% set pos_estimated = pos.estimated_entry %}
+    <tr>
+      <td class="mono" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+        <a href="/markets/{{ pos.market_id }}" title="{{ pos.market_id }}">{{ pos.market_id[:16] }}{% if pos.market_id|length > 16 %}…{% endif %}</a>
+      </td>
+      <td>{{ pos.selection or "—" }}</td>
+      <td class="mono">{{ "%.2f"|format(pos.remaining_shares) }}</td>
+      <td class="mono">
+        {% if pos_missing %}—
+        {% elif pos_estimated %}{{ "%.3f"|format(pos.avg_entry_price) }} <span style="color:#888;" title="Entry price estimated from sell price">&Dagger;</span>
+        {% else %}{{ "%.3f"|format(pos.avg_entry_price) }}{% endif %}
+      </td>
+      <td class="mono">
+        {% if pos_missing %}— <span style="color:#777;">&dagger;</span>
+        {% elif pos_estimated %}{{ pos.total_cost_basis | usd }} <span style="color:#888;" title="Entry price estimated from sell price">&Dagger;</span>
+        {% else %}{{ pos.total_cost_basis | usd }}{% endif %}
+      </td>
+      <td class="mono muted">
+        {% if pos_missing %}— <span style="color:#777;">&dagger;</span>
+        {% elif pos_estimated %}—
+        {% elif pos.remaining_shares > 0 and pos.status == "Open" %}{{ (pos.remaining_shares * pos.avg_entry_price) | usd }}
+        {% else %}—{% endif %}
+      </td>
+      <td class="mono" style="color:{{ '#6dce79' if pos.realized_pnl >= 0 else '#ff7070' }}">
+        {{ pos.realized_pnl | usd }}
+      </td>
+      <td class="mono">
+        {% if pos.status == "Closed" and pos.total_cost_basis > 0 %}
+        {% set roi = pos.realized_pnl / pos.total_cost_basis * 100 %}
+        <span style="color:{{ '#6dce79' if roi >= 0 else '#ff7070' }}">{{ "%.1f%%"|format(roi) }}</span>
+        {% else %}—{% endif %}
+      </td>
+      <td>
+        {% if pos.status == "Open" %}<span style="color:#7eb8f7;">Open</span>
+        {% else %}<span class="muted">Closed</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if positions_missing or has_estimated_entry %}
+<div style="font-size:12px;color:#666;margin-top:8px;line-height:1.7;">
+  {% if positions_missing %}<div>&dagger; Initial trade data unavailable. Cost basis and P&amp;L cannot be calculated.</div>{% endif %}
+  {% if has_estimated_entry %}<div>&Dagger; Entry price estimated from sell price. Buy trades were not captured &mdash; ROI shown as 0%.</div>{% endif %}
+</div>
+{% endif %}
+{% else %}
+<p class="empty">No positions recorded.</p>
+{% endif %}

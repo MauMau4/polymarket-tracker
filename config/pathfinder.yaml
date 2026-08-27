@@ -1,0 +1,135 @@
+# Pathfinder strategy configuration.
+#
+# Single source of truth for every parameter in PRD polymarket-follower-prd.md
+# §5. Every value here is a config parameter, not a constant in code — per
+# CLAUDE.md ("Config over constants") and architecture §5 ("unknown keys are
+# errors"). Changing any value = a new config_version = a decisions/ entry.
+#
+# M1 (this version) only *consumes* the `scoring` section. The other sections
+# carry the PRD's declared defaults ahead of the milestones that use them
+# (event study, simulator, daemon, risk engine) so they don't need to be
+# invented later without a paper trail.
+
+config_version: "1.0.0"
+
+scoring:
+  # PRD §5.1 — wallet qualification, point-in-time.
+  formation_window_days: 90
+  min_closed_positions: 20
+  min_mean_roi: 0.15
+  skill_vs_implied_required: true
+  concentration_cap: 0.60
+  sybil_exclusion_enabled: true
+  # Pathfinder addition beyond the PRD text (see decisions/2026-07-15.md):
+  # wallet_closed_positions.closed_at_source values to exclude from scoring
+  # windows entirely. 'end_date_proxy' is the tag applied by the 2026-07-14
+  # backfill to rows whose resolution status could not be verified against
+  # live Gamma (includes the false-resolution/drift cases from the schema
+  # audit, Q4) — this is the operative mechanism for "exclude disputed/
+  # invalidated markets" given Polymarket exposes no direct dispute flag.
+  excluded_closed_at_sources:
+    - end_date_proxy
+
+signal:
+  # PRD §5.2 — signal definition.
+  signal_min_notional_usd: 500
+  accumulation_window_minutes: 60
+  price_floor: 0.05
+  price_ceiling: 0.90
+  volume_floor_usd: 10000
+  # Pathfinder addition beyond the PRD text (see decisions/2026-07-17.md):
+  # the PRD states "market trailing 24h volume >= volume_floor_usd" as a
+  # single sentence — 24h is structural to the requirement, not itself a
+  # named tunable, but "no magic numbers in code" (pathfinder/CLAUDE.md)
+  # means it still needs a config home rather than a hardcoded literal.
+  volume_window_hours: 24
+  min_hours_to_resolution: 24
+  detection_lag_seconds: 180
+
+entry:
+  # PRD §5.3. entry_delay is a declared research variable (see `grid` below);
+  # this is the single value used wherever the pipeline needs one concrete
+  # setting outside of the grid sweep itself.
+  entry_delay_minutes: 30
+  slippage_allowance_cents: 2
+
+sizing:
+  # PRD §5.4 — sizing & portfolio limits.
+  per_signal_size_pct: 0.025
+  max_concurrent_positions: 10
+  max_per_market_pct: 0.05
+  max_per_event_cluster_pct: 0.10
+  max_gross_exposure_pct: 0.25
+
+exits:
+  # PRD §5.5 — exits (first triggered wins).
+  follow_exit_reduction_pct: 0.50
+  take_profit_multiple: 1.75
+  take_profit_sell_pct: 0.50
+  trailing_stop_pct: 0.25
+  synthetic_stop_multiple: 0.50
+  stop_escalation_wait_minutes: 5
+  cooldown_hours: 24
+
+costs:
+  # PRD §5.6 — cost model.
+  base_cost_cents: 1
+  stress_cost_cents: 2
+  gas_usd: 0.0
+
+risk:
+  # PRD FR-8 — kill switch & auto-pause triggers.
+  daily_loss_pause_pct: 0.08
+  soft_pause_dd_pct: 0.20
+  hard_stop_dd_pct: 0.25
+  detection_lag_pause_multiple: 2.0
+  stale_feed_minutes: 5
+  consecutive_rejections_pause: 3
+
+daemon:
+  # PRD architecture §3.6.
+  qualified_set_refresh_hours: 6
+
+alerts:
+  # PRD §5.5 / FR-7.
+  alert_only_mode: true
+
+booklog:
+  # PRD architecture §3.5 — Deliverable 3.
+  snapshot_interval_seconds: 60
+  book_depth_levels: 3
+  volume_floor_usd: 10000
+  # Explicit volume-floor bypass for live outright championship/conference
+  # books (decisions/2026-07-19.md, item 2) — exact Gamma event_title match.
+  # These carry large open interest with modest day-to-day volume (some
+  # already ingested with a stale/zero `markets.volume`) and are exactly
+  # where future Variant-C-family work needs real spread history. Hand-
+  # curated per season — Polymarket's event_title naming isn't stable across
+  # seasons (e.g. NFL 2024's "AFC Champion" vs. 2026's "Pro Football: 2027
+  # AFC Champion "), so a keyword/regex match isn't safe to auto-extend.
+  # A few entries below aren't fully ingested into `markets` yet as of
+  # 2026-07-19 (discovery-completeness gap, same decision entry) — the
+  # bypass is a no-op for those rows until ingestion catches up; NBA/NHL
+  # Western Conference Champion 2026-27 books don't exist on Polymarket yet
+  # at all, so aren't listed. Re-review each season.
+  watchlist_event_titles:
+    - "NFL Champion 2027"
+    - "Pro Football: 2027 AFC Champion "
+    - "Pro Football: 2027 NFC Champion "
+    - "NBA: 2027 Champion"
+    - "NBA: 2027 Eastern Conference Champion"
+    - "NHL: 2027 Champion"
+    - "NHL: 2027 Eastern Conference Champion"
+    - "MLB World Series Champion 2026"
+    - "MLB: 2026 American League Champion"
+    - "MLB: 2026 National League Champion"
+    - "UEFA Champions League: 2027 Champion"
+    - "World Cup Winner "
+
+grid:
+  # PRD §7.4 — the ONLY cells tested in the event study / simulator. Do not
+  # add cells or test values outside this set (pathfinder/CLAUDE.md rule 5).
+  min_mean_roi: [0.10, 0.15, 0.20]
+  entry_delay_minutes: [5, 30, 60, 240]
+  slippage_allowance_cents: [1, 2, 3]
+  formation_window_days: [60, 90, 180]

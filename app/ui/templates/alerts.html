@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Alert Log — Whale Tracker{% endblock %}
+{% block content %}
+<h1>Alert Log</h1>
+
+{% set pg = pagination %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+  <div style="font-size:13px;color:#777;">
+    Last {{ window_hours }}h — {{ total_in_window }} alert{% if total_in_window != 1 %}s{% endif %} in window
+    {% if pg.total > 0 %}
+      &nbsp;·&nbsp; Showing {{ pg.offset + 1 }}–{{ [pg.offset + pg.page_size, pg.total] | min }}
+    {% endif %}
+  </div>
+  {% if pg.total_pages > 1 %}
+  <div class="pager">
+    {% if pg.prev_url %}<a href="{{ pg.prev_url }}">← Prev</a>{% else %}<span>← Prev</span>{% endif %}
+    <span style="background:none;border:none;color:#666;">{{ pg.page }} / {{ pg.total_pages }}</span>
+    {% if pg.next_url %}<a href="{{ pg.next_url }}">Next →</a>{% else %}<span>Next →</span>{% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<section>
+  {% if alerts %}
+  <table>
+    <thead>
+      <tr>
+        <th>Time (UTC)</th>
+        <th>Severity</th>
+        <th>Type</th>
+        <th>Wallet</th>
+        <th>Market</th>
+        <th>Message</th>
+        <th>Sent</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in alerts %}
+      <tr>
+        <td class="mono muted" style="white-space:nowrap">{{ a.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td><span class="badge badge-{{ a.severity }}">{{ a.severity }}</span></td>
+        <td style="white-space:nowrap">{{ a.alert_type }}</td>
+        <td class="mono">
+          {% if a.wallet %}
+            <a href="/wallets/{{ a.wallet }}">{{ a.wallet[:6] }}...{{ a.wallet[-4:] }}</a>
+          {% else %}<span class="muted">—</span>{% endif %}
+        </td>
+        <td class="mono">
+          {% if a.market_id %}
+            <a href="/markets/{{ a.market_id }}">{{ a.market_id[:12] }}{% if a.market_id|length > 12 %}…{% endif %}</a>
+          {% else %}<span class="muted">—</span>{% endif %}
+        </td>
+        {% set display_msg = inject_side_into_action(a.message, a.payload) %}
+        <td style="max-width:320px; white-space:pre-wrap; font-size:12px; color:#aaa">{{ display_msg[:200] }}{% if display_msg|length > 200 %}…{% endif %}</td>
+        <td>
+          {% if a.sent %}<span class="badge badge-sent">sent</span>
+          {% else %}<span class="badge badge-unsent">unsent</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if pg.total_pages > 1 %}
+  <div class="pager" style="margin-top:16px;justify-content:flex-end;">
+    {% if pg.prev_url %}<a href="{{ pg.prev_url }}">← Prev</a>{% else %}<span>← Prev</span>{% endif %}
+    <span style="background:none;border:none;color:#666;">{{ pg.page }} / {{ pg.total_pages }}</span>
+    {% if pg.next_url %}<a href="{{ pg.next_url }}">Next →</a>{% else %}<span>Next →</span>{% endif %}
+  </div>
+  {% endif %}
+  {% else %}
+  <p class="empty">No alerts in the last {{ window_hours }} hours.</p>
+  {% endif %}
+</section>
+{% endblock %}

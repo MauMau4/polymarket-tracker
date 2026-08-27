@@ -1,0 +1,45 @@
+{% set p = pagination %}
+{% if alerts %}
+{% if p.total_pages > 1 %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+  <span class="muted" style="font-size:12px;">
+    Showing {{ p.offset + 1 }}–{{ [p.offset + p.page_size, p.total] | min }} of {{ p.total }}
+  </span>
+  <div class="pager">
+    {% if p.ajax_prev_url %}<a href="{{ p.prev_url }}" data-ajax-table="alerts" data-ajax-url="{{ p.ajax_prev_url }}">← Prev</a>{% else %}<span>← Prev</span>{% endif %}
+    <span style="background:none;border:none;color:#666;">{{ p.page }} / {{ p.total_pages }}</span>
+    {% if p.ajax_next_url %}<a href="{{ p.next_url }}" data-ajax-table="alerts" data-ajax-url="{{ p.ajax_next_url }}">Next →</a>{% else %}<span>Next →</span>{% endif %}
+  </div>
+</div>
+{% endif %}
+<table>
+  <thead>
+    <tr>
+      <th>Time (UTC)</th>
+      <th>Severity</th>
+      <th>Type</th>
+      <th>Market</th>
+      <th>Sent</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for a in alerts %}
+    <tr>
+      <td class="mono muted">{{ a.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+      <td><span class="badge badge-{{ a.severity }}">{{ a.severity }}</span></td>
+      <td>{{ a.alert_type }}</td>
+      <td class="mono muted">
+        {% if a.market_id %}<a href="/markets/{{ a.market_id }}">{{ a.market_id[:14] }}{% if a.market_id|length > 14 %}…{% endif %}</a>
+        {% else %}—{% endif %}
+      </td>
+      <td>
+        {% if a.sent %}<span class="badge badge-sent">sent</span>
+        {% else %}<span class="badge badge-unsent">unsent</span>{% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No alerts for this wallet.</p>
+{% endif %}

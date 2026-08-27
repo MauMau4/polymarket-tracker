@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}Markets — Whale Tracker{% endblock %}
+{% block content %}
+
+<h1>Markets</h1>
+
+<form method="get" action="/markets" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:20px;align-items:flex-end;">
+
+  <div>
+    <label style="display:block;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px;">Search</label>
+    <input
+      type="text"
+      name="q"
+      value="{{ filters.q }}"
+      placeholder="keyword…"
+      style="background:#0f0f0f;color:#d4d4d4;border:1px solid #2a2a2a;border-radius:4px;padding:5px 10px;font-size:13px;width:200px;"
+    />
+  </div>
+
+  <div>
+    <label style="display:block;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px;">Status</label>
+    <select name="status" style="background:#0f0f0f;color:#d4d4d4;border:1px solid #2a2a2a;border-radius:4px;padding:5px 8px;font-size:13px;">
+      <option value="active" {% if filters.status == "active" %}selected{% endif %}>
+        Active ({{ status_counts.active }})
+      </option>
+      <option value="all" {% if filters.status == "all" %}selected{% endif %}>All statuses</option>
+      {% if status_counts.closed > 0 %}
+      <option value="closed" {% if filters.status == "closed" %}selected{% endif %}>
+        Closed ({{ status_counts.closed }})
+      </option>
+      {% endif %}
+      {% if status_counts.resolved > 0 %}
+      <option value="resolved" {% if filters.status == "resolved" %}selected{% endif %}>
+        Resolved ({{ status_counts.resolved }})
+      </option>
+      {% endif %}
+    </select>
+  </div>
+
+  {% if categories %}
+  <div>
+    <label style="display:block;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px;">Category</label>
+    <select name="category" style="background:#0f0f0f;color:#d4d4d4;border:1px solid #2a2a2a;border-radius:4px;padding:5px 8px;font-size:13px;">
+      <option value="" {% if not filters.category %}selected{% endif %}>All categories</option>
+      {% for cat in categories %}
+      <option value="{{ cat }}" {% if filters.category == cat %}selected{% endif %}>{{ cat }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+
+  {% if subcategories %}
+  <div>
+    <label style="display:block;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px;">Sub-category</label>
+    <select name="subcategory" style="background:#0f0f0f;color:#d4d4d4;border:1px solid #2a2a2a;border-radius:4px;padding:5px 8px;font-size:13px;">
+      <option value="" {% if not filters.subcategory %}selected{% endif %}>All</option>
+      {% for sub in subcategories %}
+      <option value="{{ sub }}" {% if filters.subcategory == sub %}selected{% endif %}>{{ sub }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+
+  <div>
+    <label style="display:block;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px;">Ends after</label>
+    <input
+      type="text"
+      name="end_after"
+      value="{{ filters.end_after }}"
+      placeholder="YYYY-MM-DD"
+      style="background:#0f0f0f;color:#d4d4d4;border:1px solid #2a2a2a;border-radius:4px;padding:5px 8px;font-size:13px;width:120px;"
+    />
+  </div>
+
+  <div>
+    <label style="display:block;font-size:11px;color:#666;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px;">Ends before</label>
+    <input
+      type="text"
+      name="end_before"
+      value="{{ filters.end_before }}"
+      placeholder="YYYY-MM-DD"
+      style="background:#0f0f0f;color:#d4d4d4;border:1px solid #2a2a2a;border-radius:4px;padding:5px 8px;font-size:13px;width:120px;"
+    />
+  </div>
+
+  <div style="display:flex;gap:8px;">
+    <button type="submit" style="background:#1e3a5f;color:#7eb8f7;border:none;border-radius:4px;padding:6px 14px;cursor:pointer;font-size:13px;">Filter</button>
+    <a href="/markets" style="background:#1a1a1a;color:#888;border:1px solid #2a2a2a;border-radius:4px;padding:6px 14px;font-size:13px;text-decoration:none;">Reset</a>
+  </div>
+
+</form>
+
+{% set page_first = pagination.offset + 1 %}
+{% set page_last  = [pagination.offset + pagination.page_size, pagination.total] | min %}
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+  <p style="font-size:12px;color:#555;margin:0;">
+    {% if pagination.total == 0 %}
+      No markets match the current filters.
+    {% else %}
+      Showing {{ page_first }}–{{ page_last }} of {{ pagination.total }} market{% if pagination.total != 1 %}s{% endif %}
+    {% endif %}
+  </p>
+
+  {% if pagination.total_pages > 1 %}
+  <div style="display:flex;gap:6px;align-items:center;">
+    {% if pagination.prev_url %}
+    <a href="{{ pagination.prev_url }}"
+       style="background:#1a1a1a;color:#7eb8f7;border:1px solid #2a2a2a;border-radius:4px;padding:4px 12px;font-size:12px;text-decoration:none;">← Prev</a>
+    {% else %}
+    <span style="color:#444;font-size:12px;padding:4px 12px;">← Prev</span>
+    {% endif %}
+
+    <span style="font-size:12px;color:#666;">Page {{ pagination.page }} / {{ pagination.total_pages }}</span>
+
+    {% if pagination.next_url %}
+    <a href="{{ pagination.next_url }}"
+       style="background:#1a1a1a;color:#7eb8f7;border:1px solid #2a2a2a;border-radius:4px;padding:4px 12px;font-size:12px;text-decoration:none;">Next →</a>
+    {% else %}
+    <span style="color:#444;font-size:12px;padding:4px 12px;">Next →</span>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<section>
+  {% if markets %}
+  <table>
+    <thead>
+      <tr>
+        <th>Question</th>
+        <th>Category</th>
+        <th>Status</th>
+        <th>End Date</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in markets %}
+      <tr>
+        <td>
+          <a href="/markets/{{ m.market_id }}">{{ m.question or m.event_title or m.market_id }}</a>
+          {% if m.event_title and m.question and m.event_title != m.question %}
+          <div style="font-size:11px;color:#555;margin-top:2px;">{{ m.event_title }}</div>
+          {% endif %}
+        </td>
+        <td class="muted">
+          {{ m.category or "—" }}
+          {% if m.subcategory %}
+          <div style="font-size:11px;color:#444;margin-top:1px;">{{ m.subcategory }}</div>
+          {% endif %}
+        </td>
+        <td>
+          {% if m.resolved %}
+            <span class="badge badge-unsent">resolved</span>
+          {% elif m.closed %}
+            <span class="badge badge-unsent">closed</span>
+          {% else %}
+            <span class="badge badge-low">active</span>
+          {% endif %}
+        </td>
+        <td class="mono muted">
+          {{ m.end_date.strftime('%Y-%m-%d') if m.end_date else "—" }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if pagination.total_pages > 1 %}
+  <div style="display:flex;gap:6px;align-items:center;margin-top:16px;justify-content:flex-end;">
+    {% if pagination.prev_url %}
+    <a href="{{ pagination.prev_url }}"
+       style="background:#1a1a1a;color:#7eb8f7;border:1px solid #2a2a2a;border-radius:4px;padding:4px 12px;font-size:12px;text-decoration:none;">← Prev</a>
+    {% else %}
+    <span style="color:#444;font-size:12px;padding:4px 12px;">← Prev</span>
+    {% endif %}
+    <span style="font-size:12px;color:#666;">Page {{ pagination.page }} / {{ pagination.total_pages }}</span>
+    {% if pagination.next_url %}
+    <a href="{{ pagination.next_url }}"
+       style="background:#1a1a1a;color:#7eb8f7;border:1px solid #2a2a2a;border-radius:4px;padding:4px 12px;font-size:12px;text-decoration:none;">Next →</a>
+    {% else %}
+    <span style="color:#444;font-size:12px;padding:4px 12px;">Next →</span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <p class="empty">No markets match the current filters.</p>
+  {% endif %}
+</section>
+{% endblock %}

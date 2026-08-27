@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}{{ market.question[:60] if market else "Market" }} — Whale Tracker{% endblock %}
+{% block content %}
+
+{% if not market %}
+<h1>Market not found</h1>
+<p class="muted">No market with this ID is in the database.</p>
+{% else %}
+
+<h1>{{ market.question or market.market_id }}</h1>
+
+<div class="card">
+  <div class="meta-grid">
+    <div class="meta-item">
+      <label>Market ID</label>
+      <span class="mono">{{ market.market_id }}</span>
+    </div>
+    <div class="meta-item">
+      <label>Category</label>
+      <span>{{ market.category or "—" }}</span>
+    </div>
+    <div class="meta-item">
+      <label>Status</label>
+      <span>
+        {% if market.resolved %}Resolved — {{ market.resolution or "?" }}
+        {% elif market.closed %}Closed
+        {% else %}Active{% endif %}
+      </span>
+    </div>
+    <div class="meta-item">
+      <label>End Date (UTC)</label>
+      <span>{{ market.end_date.strftime('%Y-%m-%d') if market.end_date else "—" }}</span>
+    </div>
+  </div>
+</div>
+
+
+<section>
+  {% set tp = trades_pagination %}
+  <h2>Trades{% if tp.total > 0 %} ({{ tp.total }}){% endif %}</h2>
+
+  <form method="get" action="/markets/{{ market.market_id }}" style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+    <input type="hidden" name="trades_page" value="1" />
+    {% if sort %}<input type="hidden" name="sort" value="{{ sort }}" />{% endif %}
+    <label style="font-size:13px;color:#aaa;">Side:</label>
+    <select name="side" onchange="this.form.submit();" style="font-size:13px;">
+      <option value="" {% if not selected_side %}selected{% endif %}>All</option>
+      <option value="BUY"  {% if selected_side == 'BUY'  %}selected{% endif %}>BUY</option>
+      <option value="SELL" {% if selected_side == 'SELL' %}selected{% endif %}>SELL</option>
+    </select>
+    {% if outcome_options %}
+    <label style="font-size:13px;color:#aaa;">Selection:</label>
+    <select name="selection" onchange="this.form.submit();" style="font-size:13px;">
+      <option value="all" {% if selected_selection == 'all' %}selected{% endif %}>All</option>
+      {% for o in outcome_options %}
+      <option value="{{ o }}" {% if selected_selection == o %}selected{% endif %}>{{ o }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+  </form>
+
+  {% if tp.total > 0 %}
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+    <span class="muted" style="font-size:12px;">
+      Showing {{ tp.offset + 1 }}–{{ [tp.offset + tp.page_size, tp.total] | min }} of {{ tp.total }}
+    </span>
+    {% if tp.total_pages > 1 %}
+    <div class="pager">
+      {% if tp.prev_url %}<a href="{{ tp.prev_url }}">← Prev</a>{% else %}<span>← Prev</span>{% endif %}
+      <span style="background:none;border:none;color:#666;">{{ tp.page }} / {{ tp.total_pages }}</span>
+      {% if tp.next_url %}<a href="{{ tp.next_url }}">Next →</a>{% else %}<span>Next →</span>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Time (UTC)</th>
+        <th>Selection</th>
+        <th>Side</th>
+        <th>Price</th>
+        <th><a href="{{ sort_url }}" style="color:inherit;text-decoration:none;">Value (USD){% if sort_indicator %} {{ sort_indicator }}{% endif %}</a></th>
+        <th>Result</th>
+        <th>Wallet</th>
+        <th>Attribution</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for t in trades %}
+      <tr>
+        <td class="mono muted">{{ t.ts.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        <td>{{ fmt_selection(t.outcome, t.side) }}</td>
+        <td class="muted">{{ t.side or "—" }}</td>
+        <td class="mono">{{ "%.4f"|format(t.price) if t.price else "—" }}</td>
+        <td class="mono">{{ t.notional_usd | usd }}</td>
+        <td>
+          {% if t.outcome_result == 1 %}<span style="color:#6dce79;font-weight:700;">Win</span>
+          {% elif t.outcome_result == 0 %}<span style="color:#ff7070;font-weight:700;">Loss</span>
+          {% else %}<span class="muted">—</span>{% endif %}
+        </td>
+        <td class="mono">
+          {% if t.wallet %}
+            <a href="/wallets/{{ t.wallet }}">{{ t.wallet[:6] }}...{{ t.wallet[-4:] }}</a>
+          {% else %}<span class="muted">unattributed</span>{% endif %}
+        </td>
+        <td class="muted">{{ t.attribution_status.value }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No trades recorded for this market.</p>
+  {% endif %}
+</section>
+
+<section>
+  <h2>Alerts ({{ alerts | length }})</h2>
+  {% if alerts %}
+  <table>
+    <thead>
+      <tr>
+        <th>Time (UTC)</th>
+        <th>Severity</th>
+        <th>Type</th>
+        <th>Wallet</th>
+        <th>Sent</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in alerts %}
+      <tr>
+        <td class="mono muted">{{ a.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td><span class="badge badge-{{ a.severity }}">{{ a.severity }}</span></td>
+        <td>{{ a.alert_type }}</td>
+        <td class="mono">
+          {% if a.wallet %}
+            <a href="/wallets/{{ a.wallet }}">{{ a.wallet[:6] }}…{{ a.wallet[-4:] }}</a>
+          {% else %}<span class="muted">—</span>{% endif %}
+        </td>
+        <td>
+          {% if a.sent %}<span class="badge badge-sent">sent</span>
+          {% else %}<span class="badge badge-unsent">unsent</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p class="empty">No alerts for this market.</p>
+  {% endif %}
+</section>
+
+{% endif %}
+{% endblock %}

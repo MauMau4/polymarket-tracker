@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Analytics — Whale Tracker{% endblock %}
+{% block content %}
+
+<h1>Analytics</h1>
+
+<section>
+  <h2>Favorite-Longshot Bias Analysis</h2>
+  <p class="muted" style="font-size:12px;margin-bottom:12px;">
+    Markets where one outcome was trading at ≥ 0.80 at T-48 or T-24 before close.
+    Only resolved markets with {{ min_sample_size }}+ samples per bucket are shown.
+  </p>
+
+  {# Category filter bar #}
+  <form method="get" action="/analytics" style="display:flex;gap:12px;align-items:center;margin-bottom:12px;">
+    <label style="font-size:13px;color:#aaa;">Category:</label>
+    <select name="category" onchange="this.form.submit();" style="font-size:13px;">
+      <option value="all" {% if selected_category == 'all' %}selected{% endif %}>All</option>
+      {% for cat in all_categories %}
+      <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ cat }}</option>
+      {% endfor %}
+    </select>
+  </form>
+
+  <p class="muted" style="font-size:12px;margin-bottom:16px;">
+    Results filtered by: <strong>{{ selected_category if selected_category != 'all' else 'All categories' }}</strong>
+  </p>
+
+  {% if rows or selected_category != 'all' %}
+  <div style="overflow-x:auto;">
+  <table>
+    <thead>
+      <tr>
+        {% if selected_category == 'all' %}<th>Category</th>{% endif %}
+        <th title="high_side_price at snapshot time, rounded to bucket">Price Bucket</th>
+        <th title="Hours before close when snapshot was taken">Snapshot Window</th>
+        <th title="Number of resolved snapshots in this bucket">Sample Size</th>
+        <th title="Average high_side_price — what the market implied as win probability">Implied Win Rate</th>
+        <th title="Percentage of snapshots where high_side_won = True">Actual Win Rate</th>
+        <th title="Actual Win Rate minus Implied Win Rate">Edge</th>
+        <th title="Average (1 − high_side_price) / high_side_price × 100 for winning snapshots only">Avg ROI (winners)</th>
+        <th title="Avg ROI × 0.98 after estimated 2% Polymarket fee">Net ROI (2% fee)</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for row in rows %}
+      <tr{% if row.sample_size == 0 %} style="opacity:0.45;"{% endif %}>
+        {% if selected_category == 'all' %}<td class="muted">{{ row.category }}</td>{% endif %}
+        <td class="mono">{{ row.price_bucket }}</td>
+        <td>
+          <span class="badge {% if row.snapshot_window == 'T24' %}badge-sent{% else %}badge-medium{% endif %}">
+            {{ row.snapshot_window }}
+          </span>
+        </td>
+        <td>{{ row.sample_size }}</td>
+        <td>{{ "%.1f%%"|format(row.implied_win_rate * 100) if row.implied_win_rate is not none else "—" }}</td>
+        <td>{{ "%.1f%%"|format(row.actual_win_rate * 100) if row.actual_win_rate is not none else "—" }}</td>
+        <td {% if row.edge is not none %}style="color:{{ '#6dce79' if row.edge >= 0 else '#ff7070' }};font-weight:600;"{% endif %}>
+          {% if row.edge is not none %}{% if row.edge >= 0 %}+{% endif %}{{ "%.1f%%"|format(row.edge * 100) }}{% else %}—{% endif %}
+        </td>
+        <td>{{ "%.1f%%"|format(row.avg_roi) if row.avg_roi else "—" }}</td>
+        <td {% if row.net_roi is not none and row.net_roi != 0 %}style="color:{{ '#6dce79' if row.net_roi >= 0 else '#ff7070' }};"{% endif %}>
+          {{ "%.1f%%"|format(row.net_roi) if row.net_roi else "—" }}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p class="empty">
+    No data yet — snapshots are collected as markets approach their close date.
+    {% if total_snapshots > 0 %}
+      {{ total_snapshots }} snapshot{{ 's' if total_snapshots != 1 else '' }} collected so far; waiting for markets to resolve
+      or for {{ min_sample_size }}+ samples per bucket.
+    {% else %}
+      Run <code>python -m app.tasks.run_price_snapshot 48</code> and
+      <code>python -m app.tasks.run_price_snapshot 24</code> to seed the first snapshots.
+    {% endif %}
+  </p>
+  {% endif %}
+
+  <p class="muted" style="font-size:11px;margin-top:16px;">
+    {% if earliest_ts %}
+      Snapshots collected since {{ earliest_ts.strftime('%Y-%m-%d %H:%M UTC') }}.
+    {% endif %}
+    Resolved markets only. Minimum {{ min_sample_size }} samples per bucket.
+    Total resolved snapshots: {{ total_snapshots }}.
+  </p>
+</section>
+
+{% endblock %}

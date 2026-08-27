@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+{% block title %}
+  {% if wallet %}{{ wallet.wallet[:10] }}... — Whale Tracker{% else %}Wallet — Whale Tracker{% endif %}
+{% endblock %}
+{% block content %}
+
+{% if not wallet %}
+<h1>Wallet not found</h1>
+<p class="muted">No wallet with this address is in the database.</p>
+{% else %}
+
+<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px;flex-wrap:wrap;">
+  <h1 class="mono" style="word-break:break-all;margin-bottom:0;">{{ wallet.wallet }}</h1>
+  {# System-assigned badges #}
+  {% for badge in badges %}
+    {% if badge == "INFORMED" %}<span class="badge badge-informed" style="font-size:13px;">INFORMED</span>{% endif %}
+    {% if badge == "SHARP"    %}<span class="badge badge-sharp"    style="font-size:13px;">SHARP</span>{% endif %}
+    {% if badge == "FARMER"   %}<span class="badge badge-farmer"   style="font-size:13px;">FARMER</span>{% endif %}
+    {% if badge == "SYBIL"    %}<span class="badge badge-sybil"    style="font-size:13px;">SYBIL</span>{% endif %}
+  {% endfor %}
+</div>
+<p class="muted" style="font-size:12px;margin-bottom:24px;">
+  First seen {{ wallet.first_seen.strftime('%Y-%m-%d') if wallet.first_seen else "—" }} &nbsp;·&nbsp;
+  Last seen {{ wallet.last_seen.strftime('%Y-%m-%d %H:%M') if wallet.last_seen else "—" }} (UTC)
+</p>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px;">
+
+  {# ── Score card ─────────────────────────────────────────────────────────── #}
+  <div class="card">
+    <h2 title="Composite score 0–100 combining weighted log ROI (60%), consistency (25%), and win rate (15%)">Composite Score</h2>
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:16px;">
+      {% if wallet.score_confidence == "Unranked" or wallet.score_confidence == "low" %}
+        <span style="font-size:32px;font-weight:700;color:#555;">—</span>
+        <span class="badge badge-unsent">Unranked</span>
+      {% else %}
+        <span style="font-size:32px;font-weight:700;color:#fff;">{{ "%.1f"|format(wallet.wallet_score) }}</span>
+        {% if wallet.score_confidence == "Verified" %}
+          <span class="badge" style="background:#1a2a00;color:#a8e063;">Verified</span>
+        {% elif wallet.score_confidence == "Established" %}
+          <span class="badge" style="background:#1a1a40;color:#7eb8f7;">Established</span>
+        {% else %}
+          <span class="badge badge-medium">Developing</span>
+        {% endif %}
+      {% endif %}
+    </div>
+    <div class="meta-grid" style="font-size:12px;">
+      <div class="meta-item">
+        <label title="Count-based win rate: closed positions with positive log ROI / total closed positions">Win Rate</label>
+        <span>{{ "%.1f%%"|format(wallet.win_rate * 100) if wallet.win_rate is not none else "—" }}</span>
+      </div>
+      <div class="meta-item">
+        <label>Realized PnL</label>
+        <span style="color:{{ '#6dce79' if (wallet.realized_pnl or 0) >= 0 else '#ff7070' }}">
+          {{ wallet.realized_pnl | usd if wallet.realized_pnl is not none else "—" }}
+        </span>
+      </div>
+      <div class="meta-item">
+        <label title="Realized PnL / total cost basis × 100">ROI</label>
+        {% if roi is not none %}
+          <span style="color:{{ '#6dce79' if roi >= 0 else '#ff7070' }}">{{ "%+.1f%%"|format(roi) }}</span>
+        {% else %}
+          <span class="muted">—</span>
+        {% endif %}
+      </div>
+      <div class="meta-item">
+        <label title="Closed position events (sells + resolutions). Includes closes whose underlying trade record has since been purged by 30-day retention, or was reconstructed from resolution data.">Closed Positions</label>
+        <span>{{ wallet.resolved_trades_count }}</span>
+      </div>
+      <div class="meta-item">
+        <label title="Distinct markets this wallet has participated in">Markets Traded</label>
+        <span>{{ distinct_markets }}</span>
+      </div>
+      <div class="meta-item">
+        <label>Score Computed</label>
+        <span class="muted">{{ wallet.score_computed_at.strftime('%Y-%m-%d %H:%M') if wallet.score_computed_at else "—" }}</span>
+      </div>
+    </div>
+  </div>
+
+  {# ── Watch / Tag / Badge management ─────────────────────────────────────── #}
+  <div class="card">
+    <h2>Watch Status, Tag &amp; Badge Override</h2>
+
+    {# Current status display #}
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px;">Current</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        {% if wallet.watch_status == "high-interest" %}
+          <span class="badge badge-high">high-interest</span>
+        {% elif wallet.watch_status == "watch" %}
+          <span class="badge badge-sent">watch</span>
+        {% elif wallet.watch_status == "ignore" %}
+          <span class="badge badge-unsent">ignore</span>
+        {% else %}
+          <span class="muted" style="font-size:13px;">No watch status</span>
+        {% endif %}
+        {% if wallet.manual_tag %}
+          <span class="badge" style="background:#1a1a2e;color:#a0a0ff;">{{ wallet.manual_tag }}</span>
+        {% endif %}
+      </div>
+      {% if wallet.notes %}
+        <p style="margin-top:8px;font-size:12px;color:#aaa;">{{ wallet.notes }}</p>
+      {% endif %}
+    </div>
+
+    <form method="post" action="/wallets/{{ wallet.wallet }}/set-watch" style="margin-bottom:10px;">
+      <div style="display:flex;gap:8px;align-items:center;">
+        <select name="watch_status" style="background:#0f0f0f;color:#d4d4d4;border:1px solid #2a2a2a;border-radius:4px;padding:5px 8px;font-size:13px;">
+          <option value="none" {% if not wallet.watch_status %}selected{% endif %}>— none —</option>
+          {% for s in valid_watch_statuses %}
+          <option value="{{ s }}" {% if wallet.watch_status == s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" style="background:#1e3a5f;color:#7eb8f7;border:none;border-radius:4px;padding:5px 12px;cursor:pointer;font-size:13px;">Set Watch</button>
+      </div>
+    </form>
+
+    <form method="post" action="/wallets/{{ wallet.wallet }}/set-tag" style="margin-bottom:10px;">
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select name="manual_tag" style="background:#0f0f0f;color:#d4d4d4;border:1px solid #2a2a2a;border-radius:4px;padding:5px 8px;font-size:13px;">
+            <option value="" {% if not wallet.manual_tag %}selected{% endif %}>— no tag —</option>
+            {% for t in valid_tags %}
+            <option value="{{ t }}" {% if wallet.manual_tag == t %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" style="background:#1e3a5f;color:#7eb8f7;border:none;border-radius:4px;padding:5px 12px;cursor:pointer;font-size:13px;">Set Tag</button>
+        </div>
+        <input type="text" name="notes" placeholder="Notes (optional)" value="{{ wallet.notes or '' }}"
+          style="background:#0f0f0f;color:#d4d4d4;border:1px solid #2a2a2a;border-radius:4px;padding:5px 8px;font-size:13px;width:100%;" />
+      </div>
+    </form>
+
+    {# Badge overrides: SYBIL, INFORMED, FARMER #}
+    <form method="post" action="/wallets/{{ wallet.wallet }}/set-badges">
+      <div style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:0.4px;margin-bottom:6px;">Badge Overrides</div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select name="force_sybil" style="background:#0f0f0f;color:#d4d4d4;border:1px solid #2a2a2a;border-radius:4px;padding:5px 8px;font-size:13px;flex:1;">
+            <option value="">Sybil: system</option>
+            <option value="true"  {% if wallet.suspected_sybil %}selected{% endif %}>Sybil: force ON</option>
+            <option value="false" {% if not wallet.suspected_sybil %}selected{% endif %}>Sybil: force OFF</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select name="force_informed" style="background:#0f0f0f;color:#d4d4d4;border:1px solid #2a2a2a;border-radius:4px;padding:5px 8px;font-size:13px;flex:1;">
+            <option value=""      {% if wallet.manual_informed is none %}selected{% endif %}>Informed: system</option>
+            <option value="true"  {% if wallet.manual_informed == true %}selected{% endif %}>Informed: force ON</option>
+            <option value="false" {% if wallet.manual_informed == false %}selected{% endif %}>Informed: force OFF</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select name="force_farmer" style="background:#0f0f0f;color:#d4d4d4;border:1px solid #2a2a2a;border-radius:4px;padding:5px 8px;font-size:13px;flex:1;">
+            <option value=""      {% if wallet.manual_farmer is none %}selected{% endif %}>Farmer: system</option>
+            <option value="true"  {% if wallet.manual_farmer == true %}selected{% endif %}>Farmer: force ON</option>
+            <option value="false" {% if wallet.manual_farmer == false %}selected{% endif %}>Farmer: force OFF</option>
+          </select>
+        </div>
+        <button type="submit" style="background:#2a0030;color:#cc88ff;border:none;border-radius:4px;padding:5px 12px;cursor:pointer;font-size:13px;align-self:flex-start;">Save Overrides</button>
+      </div>
+      <p style="font-size:11px;color:#555;margin-top:6px;">Override = force the badge ON or OFF regardless of system computation. "System" resets to auto-computed.</p>
+    </form>
+  </div>
+
+  {# ── Closed Position Provenance ────────────────────────────────────────── #}
+  {% if closed_position_provenance %}
+  <div class="card">
+    <h2 title="closed_at_source per WalletClosedPosition row. observed_exit = organic sell; gamma_settlement/end_date_proxy/operator_forced = resolution-driven close (trade row may have been purged by 30-day retention even though the close is legitimate); residual_close = sub-share dust close.">Closed Position Provenance</h2>
+    <table style="font-size:12px;">
+      <tbody>
+        {% for source, count in closed_position_provenance %}
+        <tr>
+          <td class="mono">{{ source }}</td>
+          <td class="mono" style="text-align:right;">{{ count }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+{# ── Score History ─────────────────────────────────────────────────────────── #}
+{% if score_history_pagination.total > 0 %}
+<section>
+  <h2>Score History (last 7 days)</h2>
+  <div id="section-score-history">
+  {% with pagination = score_history_pagination %}
+  {% include "frag_score_history.html" %}
+  {% endwith %}
+  </div>
+</section>
+{% endif %}
+
+{# ── Positions ─────────────────────────────────────────────────────────────── #}
+{% if positions_pagination.total > 0 %}
+<section>
+  <h2>Positions ({{ positions_pagination.total }})</h2>
+  <div id="section-positions">
+  {% with pagination = positions_pagination %}
+  {% include "frag_positions.html" %}
+  {% endwith %}
+  </div>
+</section>
+{% endif %}
+
+{# ── Recent Trades ─────────────────────────────────────────────────────────── #}
+<section>
+  <h2 onclick="toggleTrades()" style="cursor:pointer;user-select:none;">
+    <span id="trades-chevron" style="display:inline-block;margin-right:6px;transition:transform 0.15s;">▶</span>Recent Trades (last 30 days){% if trades_pagination.total > 0 %} ({{ trades_pagination.total }}){% endif %}
+  </h2>
+  <div id="trades-content" style="display:none;">
+    <div id="section-trades">
+    {% with pagination = trades_pagination %}
+    {% include "frag_trades.html" %}
+    {% endwith %}
+    </div>
+  </div>
+</section>
+
+{# ── Alerts ────────────────────────────────────────────────────────────────── #}
+<section>
+  <h2>Alerts ({{ alerts_pagination.total }})</h2>
+  <div id="section-alerts">
+  {% with pagination = alerts_pagination %}
+  {% include "frag_alerts.html" %}
+  {% endwith %}
+  </div>
+</section>
+
+{% endif %}
+
+<script>
+function toggleTrades() {
+  var content = document.getElementById('trades-content');
+  var chevron = document.getElementById('trades-chevron');
+  if (content.style.display === 'none') {
+    content.style.display = '';
+    chevron.style.transform = 'rotate(90deg)';
+  } else {
+    content.style.display = 'none';
+    chevron.style.transform = '';
+  }
+}
+
+document.addEventListener('click', function (e) {
+  var link = e.target.closest('a[data-ajax-table]');
+  if (!link) return;
+  e.preventDefault();
+  var table = link.getAttribute('data-ajax-table');
+  var ajaxUrl = link.getAttribute('data-ajax-url');
+  var section = document.getElementById('section-' + table);
+  if (!section || !ajaxUrl) { window.location.href = link.href; return; }
+  section.style.opacity = '0.4';
+  section.style.pointerEvents = 'none';
+  fetch(ajaxUrl)
+    .then(function (r) {
+      if (!r.ok) throw new Error('fetch failed');
+      return r.text();
+    })
+    .then(function (html) {
+      section.innerHTML = html;
+      section.style.opacity = '';
+      section.style.pointerEvents = '';
+    })
+    .catch(function () {
+      section.style.opacity = '';
+      section.style.pointerEvents = '';
+      window.location.href = link.href;
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% if score_history %}
+{% set p = pagination %}
+{% if p.total_pages > 1 %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+  <span class="muted" style="font-size:12px;">
+    Showing {{ p.offset + 1 }}–{{ [p.offset + p.page_size, p.total] | min }} of {{ p.total }}
+  </span>
+  <div class="pager">
+    {% if p.ajax_prev_url %}<a href="{{ p.prev_url }}" data-ajax-table="score-history" data-ajax-url="{{ p.ajax_prev_url }}">← Prev</a>{% else %}<span>← Prev</span>{% endif %}
+    <span style="background:none;border:none;color:#666;">{{ p.page }} / {{ p.total_pages }}</span>
+    {% if p.ajax_next_url %}<a href="{{ p.next_url }}" data-ajax-table="score-history" data-ajax-url="{{ p.ajax_next_url }}">Next →</a>{% else %}<span>Next →</span>{% endif %}
+  </div>
+</div>
+{% endif %}
+<table>
+  <thead>
+    <tr>
+      <th>Time (UTC)</th>
+      <th>Score</th>
+      <th>Tier</th>
+      <th>Log ROI (norm)</th>
+      <th>Consistency (norm)</th>
+      <th>Win Rate (norm)</th>
+      <th>Closed</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for h in score_history %}
+    <tr>
+      <td class="mono muted">{{ h.snapshot_ts.strftime('%Y-%m-%d %H:%M') }}</td>
+      <td><strong>{{ "%.1f"|format(h.score) }}</strong></td>
+      <td class="muted">{{ h.confidence }}</td>
+      <td class="mono muted">{{ "%.1f"|format(h.components.get("weighted_log_roi_normalized", 0)) }}</td>
+      <td class="mono muted">{{ "%.1f"|format(h.components.get("consistency_normalized", 0)) }}</td>
+      <td class="mono muted">{{ "%.1f"|format(h.components.get("win_rate_normalized", 0)) }}</td>
+      <td class="mono muted">{{ h.components.get("closed_count", "—") }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">No score history in the last 30 days.</p>
+{% endif %}

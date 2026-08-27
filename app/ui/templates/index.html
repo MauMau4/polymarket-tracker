@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Whale Tracker{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+
+<section>
+  {% set ep = expiring_pagination %}
+  <h2>Markets Closing Within 72 Hours
+    {% if ep.total > 0 %}<span class="muted" style="font-weight:400;font-size:12px;">({{ ep.total }})</span>{% endif %}
+  </h2>
+
+  {# Filter bar #}
+  <form method="get" action="/" style="display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+    <label style="font-size:13px;color:#aaa;">Category:</label>
+    <select name="category" onchange="this.form.subcategory.value='all';this.form.submit();" style="font-size:13px;">
+      <option value="all" {% if expiring_selected_category == 'all' %}selected{% endif %}>All</option>
+      {% for cat in expiring_categories %}
+      <option value="{{ cat }}" {% if expiring_selected_category == cat %}selected{% endif %}>{{ cat }}</option>
+      {% endfor %}
+    </select>
+    <label style="font-size:13px;color:#aaa;">Subcategory:</label>
+    <select name="subcategory" onchange="this.form.submit();" style="font-size:13px;">
+      <option value="all" {% if expiring_selected_subcategory == 'all' %}selected{% endif %}>All</option>
+      {% for sub in expiring_subcategories %}
+      <option value="{{ sub }}" {% if expiring_selected_subcategory == sub %}selected{% endif %}>{{ sub }}</option>
+      {% endfor %}
+    </select>
+    <label style="font-size:13px;color:#aaa;">Min Volume:</label>
+    <select name="min_volume" onchange="this.form.submit();" style="font-size:13px;">
+      <option value="0"      {% if expiring_min_volume == 0      %}selected{% endif %}>Any</option>
+      <option value="1000"   {% if expiring_min_volume == 1000   %}selected{% endif %}>$1K+</option>
+      <option value="5000"   {% if expiring_min_volume == 5000   %}selected{% endif %}>$5K+</option>
+      <option value="10000"  {% if expiring_min_volume == 10000  %}selected{% endif %}>$10K+</option>
+      <option value="25000"  {% if expiring_min_volume == 25000  %}selected{% endif %}>$25K+</option>
+      <option value="50000"  {% if expiring_min_volume == 50000  %}selected{% endif %}>$50K+</option>
+      <option value="100000" {% if expiring_min_volume == 100000 %}selected{% endif %}>$100K+</option>
+    </select>
+    <label style="font-size:13px;color:#aaa;">Min Price:</label>
+    <select name="min_price" onchange="this.form.submit();" style="font-size:13px;">
+      <option value="0"    {% if expiring_min_price == 0    %}selected{% endif %}>Any</option>
+      <option value="0.70" {% if expiring_min_price == 0.70 %}selected{% endif %}>≥0.70</option>
+      <option value="0.75" {% if expiring_min_price == 0.75 %}selected{% endif %}>≥0.75</option>
+      <option value="0.80" {% if expiring_min_price == 0.80 %}selected{% endif %}>≥0.80</option>
+      <option value="0.85" {% if expiring_min_price == 0.85 %}selected{% endif %}>≥0.85</option>
+      <option value="0.90" {% if expiring_min_price == 0.90 %}selected{% endif %}>≥0.90</option>
+      <option value="0.95" {% if expiring_min_price == 0.95 %}selected{% endif %}>≥0.95</option>
+    </select>
+    <span style="font-size:11px;color:#555;margin-left:4px;">
+      {% if prices_age_min is not none %}Prices: {{ prices_age_min }}m ago (cached){% else %}Prices: live{% endif %}
+    </span>
+  </form>
+
+  {% if ep.total > 0 %}
+  {% if ep.total_pages > 1 %}
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+    <span class="muted" style="font-size:12px;">
+      Showing {{ ep.offset + 1 }}–{{ [ep.offset + ep.page_size, ep.total] | min }} of {{ ep.total }}
+    </span>
+    <div class="pager">
+      {% if ep.prev_url %}<a href="{{ ep.prev_url }}">← Prev</a>{% else %}<span>← Prev</span>{% endif %}
+      <span style="background:none;border:none;color:#666;">{{ ep.page }} / {{ ep.total_pages }}</span>
+      {% if ep.next_url %}<a href="{{ ep.next_url }}">Next →</a>{% else %}<span>Next →</span>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+  <table>
+    <thead>
+      <tr>
+        <th>Market</th>
+        <th>Category</th>
+        <th>Subcategory</th>
+        <th>Volume</th>
+        <th>Outcomes</th>
+        <th>Closes (UTC)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in expiring_markets %}
+      {% set price_info = expiring_prices.get(m.market_id) %}
+      <tr>
+        <td>
+          <a href="/markets/{{ m.market_id }}">{{ m.question or m.market_id }}</a>
+          {% if m.event_title and m.event_title != m.question %}
+          <div style="font-size:11px;color:#555;margin-top:2px;">{{ m.event_title }}</div>
+          {% endif %}
+        </td>
+        <td class="muted">{{ m.category or "—" }}</td>
+        <td class="muted">{{ m.subcategory or "—" }}</td>
+        <td class="mono muted" style="font-size:12px;">{{ m.volume | volume }}</td>
+        <td class="mono" style="font-size:12px;white-space:nowrap;">
+          {% if price_info and price_info.pairs %}
+            {% for label, price in price_info.pairs %}
+              <div>
+                {{ label }}:
+                {% if price is not none %}
+                  {% if not price_info.live %}~{% endif %}{{ "%.2f"|format(price) }}
+                {% endif %}
+              </div>
+            {% endfor %}
+          {% else %}
+            —
+          {% endif %}
+        </td>
+        <td class="mono muted">{{ m.end_date.strftime('%Y-%m-%d %H:%M') if m.end_date else "—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p style="margin-top:8px;"><a href="/markets">View all markets &rarr;</a></p>
+  {% else %}
+  <p class="empty">No markets closing within 72 hours.</p>
+  {% endif %}
+</section>
+{% endblock %}

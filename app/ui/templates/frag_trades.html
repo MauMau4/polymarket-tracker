@@ -1,0 +1,74 @@
+{% set p = pagination %}
+{% if trades %}
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+  <span class="muted" style="font-size:12px;">
+    Showing {{ p.offset + 1 }}–{{ [p.offset + p.page_size, p.total] | min }} of {{ p.total }}
+  </span>
+  {% if p.total_pages > 1 %}
+  <div class="pager">
+    {% if p.ajax_prev_url %}<a href="{{ p.prev_url }}" data-ajax-table="trades" data-ajax-url="{{ p.ajax_prev_url }}">← Prev</a>{% else %}<span>← Prev</span>{% endif %}
+    <span style="background:none;border:none;color:#666;">{{ p.page }} / {{ p.total_pages }}</span>
+    {% if p.ajax_next_url %}<a href="{{ p.next_url }}" data-ajax-table="trades" data-ajax-url="{{ p.ajax_next_url }}">Next →</a>{% else %}<span>Next →</span>{% endif %}
+  </div>
+  {% endif %}
+</div>
+<table>
+  <thead>
+    <tr>
+      <th>Time (UTC)</th>
+      <th>Market</th>
+      <th>Side</th>
+      <th>Selection</th>
+      <th title="Number of shares traded">Shares</th>
+      <th>Price</th>
+      <th title="Entry price × shares (BUY) or WCP cost basis (SELL)">Cost Basis</th>
+      <th title="Price × shares for this trade">Trade Value</th>
+      <th title="Realized profit/loss on SELL trades">Realized PnL</th>
+      <th title="ROI % for SELL trades: (exit − entry) / entry × 100">ROI</th>
+      <th>Result</th>
+      <th>Type</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for t in trades %}
+    <tr>
+      <td class="mono muted">{{ t.ts.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+      <td class="mono" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+        <a href="/markets/{{ t.market_id }}" title="{{ t.market_id }}">{{ t.market_id[:16] }}{% if t.market_id|length > 16 %}…{% endif %}</a>
+      </td>
+      <td class="muted">{{ t.side or "—" }}</td>
+      <td>{{ fmt_selection(t.outcome, t.side) }}</td>
+      <td class="mono">{{ "%.2f"|format(t.size) if t.size else "—" }}</td>
+      <td class="mono">{{ "%.4f"|format(t.price) if t.price else "—" }}</td>
+      <td class="mono">
+        {% if t.missing_cost_basis %}— <span style="color:#777;">&dagger;</span>
+        {% elif t.cost_basis is not none %}{{ t.cost_basis | usd }}
+        {% else %}—{% endif %}
+      </td>
+      <td class="mono">{{ t.trade_value | usd if t.trade_value is not none else "—" }}</td>
+      <td class="mono" style="color:{{ '#6dce79' if t.realized_pnl is not none and t.realized_pnl >= 0 else '#ff7070' if t.realized_pnl is not none else 'inherit' }}">
+        {{ t.realized_pnl | usd if t.realized_pnl is not none else "—" }}
+      </td>
+      <td class="mono" style="color:{{ '#6dce79' if t.roi_pct is not none and t.roi_pct >= 0 else '#ff7070' if t.roi_pct is not none else 'inherit' }}">
+        {{ "%.1f%%"|format(t.roi_pct) if t.roi_pct is not none else "—" }}
+      </td>
+      <td>
+        {% if t.result == "WIN" %}<span style="color:#6dce79;font-weight:700;">Win</span>
+        {% elif t.result == "LOSS" %}<span style="color:#ff7070;font-weight:700;">Loss</span>
+        {% elif t.result == "SOLD" %}<span style="color:#7eb8f7;">Sold</span>
+        {% elif t.result == "CLOSED" %}<span class="muted">Closed</span>
+        {% else %}<span class="muted">Open</span>{% endif %}
+      </td>
+      <td class="muted">{{ t.trade_type or "—" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if has_missing_cost_basis %}
+<p style="font-size:12px;color:#666;margin-top:8px;">
+  &dagger; Initial trade data unavailable. Cost basis and P&amp;L cannot be calculated.
+</p>
+{% endif %}
+{% else %}
+<p class="empty">No trades recorded for this wallet.</p>
+{% endif %}

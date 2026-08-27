@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Wallets — Whale Tracker{% endblock %}
+{% block content %}
+
+<h1>Wallets</h1>
+
+{# ── Search + Filter bar ─────────────────────────────────────────────────── #}
+<form method="get" action="/wallets" class="filter-bar" style="margin-bottom:16px;">
+  <input
+    type="text"
+    name="q"
+    value="{{ filters.q }}"
+    placeholder="Search wallet address…"
+    style="width:260px;"
+  />
+  <select name="period">
+    <option value="24h" {% if filters.period == "24h" %}selected{% endif %}>Last 24h</option>
+    <option value="7d"  {% if filters.period == "7d"  %}selected{% endif %}>Last 7 days</option>
+    <option value="all" {% if filters.period == "all" %}selected{% endif %}>All time</option>
+  </select>
+  <select name="confidence">
+    <option value=""     {% if not filters.confidence %}selected{% endif %}>Any confidence</option>
+    <option value="high"   {% if filters.confidence == "high"   %}selected{% endif %}>High</option>
+    <option value="medium" {% if filters.confidence == "medium" %}selected{% endif %}>Medium</option>
+    <option value="low"    {% if filters.confidence == "low"    %}selected{% endif %}>Low</option>
+  </select>
+  <select name="watch_status">
+    <option value=""          {% if not filters.watch_status %}selected{% endif %}>Any watch</option>
+    <option value="watched"   {% if filters.watch_status == "watched"   %}selected{% endif %}>Watched</option>
+    <option value="unwatched" {% if filters.watch_status == "unwatched" %}selected{% endif %}>Unwatched</option>
+  </select>
+  <select name="suspected_sybil">
+    <option value=""    {% if not filters.suspected_sybil %}selected{% endif %}>Any sybil</option>
+    <option value="yes" {% if filters.suspected_sybil == "yes" %}selected{% endif %}>Sybil: Yes</option>
+    <option value="no"  {% if filters.suspected_sybil == "no"  %}selected{% endif %}>Sybil: No</option>
+  </select>
+  {# preserve sort/order across filter changes #}
+  <input type="hidden" name="sort"  value="{{ filters.sort }}">
+  <input type="hidden" name="order" value="{{ filters.order }}">
+  <button type="submit">Filter</button>
+  <a href="/wallets" style="font-size:12px;color:#555;align-self:center;margin-left:4px;">Reset</a>
+</form>
+
+{# ── Pagination summary ──────────────────────────────────────────────────── #}
+{% set page_first = pagination.offset + 1 %}
+{% set page_last  = [pagination.offset + pagination.page_size, pagination.total] | min %}
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+  <p style="font-size:12px;color:#555;margin:0;">
+    {% if pagination.total == 0 %}
+      No wallets match the current filter.
+    {% else %}
+      Showing {{ page_first }}–{{ page_last }} of {{ pagination.total }} wallet{% if pagination.total != 1 %}s{% endif %}
+    {% endif %}
+  </p>
+  {% if pagination.total_pages > 1 %}
+  <div class="pager">
+    {% if pagination.prev_url %}<a href="{{ pagination.prev_url }}">← Prev</a>{% else %}<span>← Prev</span>{% endif %}
+    <span style="background:none;border:none;color:#666;">Page {{ pagination.page }} / {{ pagination.total_pages }}</span>
+    {% if pagination.next_url %}<a href="{{ pagination.next_url }}">Next →</a>{% else %}<span>Next →</span>{% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% if wallets %}
+<table>
+  <thead>
+    <tr>
+      <th>Address</th>
+      <th><a href="{{ sort_url('score') }}">Score{% if filters.sort == 'score' %} {{ '↑' if filters.order == 'asc' else '↓' }}{% endif %}</a></th>
+      <th><a href="{{ sort_url('confidence') }}">Confidence{% if filters.sort == 'confidence' %} {{ '↑' if filters.order == 'asc' else '↓' }}{% endif %}</a></th>
+      <th>Badges</th>
+      <th>Watch</th>
+      <th><a href="{{ sort_url('markets') }}" title="Distinct markets traded">Markets{% if filters.sort == 'markets' %} {{ '↑' if filters.order == 'asc' else '↓' }}{% endif %}</a></th>
+      <th>Resolved</th>
+      <th><a href="{{ sort_url('last_seen') }}">Last Seen (UTC){% if filters.sort == 'last_seen' %} {{ '↑' if filters.order == 'asc' else '↓' }}{% endif %}</a></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for w in wallets %}
+    {% set badges = wallet_badges(w) %}
+    <tr>
+      <td class="mono">
+        <a href="/wallets/{{ w.wallet }}">{{ w.wallet[:8] }}...{{ w.wallet[-6:] }}</a>
+      </td>
+      <td>
+        {% if w.score_confidence == "low" %}
+          <span class="muted">—</span>
+        {% else %}
+          <strong>{{ "%.1f"|format(w.wallet_score) }}</strong>
+        {% endif %}
+      </td>
+      <td>
+        {% if w.score_confidence == "high" %}
+          <span class="badge" style="background:#1a2a00;color:#a8e063;">high</span>
+        {% elif w.score_confidence == "medium" %}
+          <span class="badge badge-medium">med</span>
+        {% else %}
+          <span class="badge badge-unsent">low</span>
+        {% endif %}
+      </td>
+      <td>
+        {% for badge in badges %}
+          {% if badge == "INFORMED" %}<span class="badge badge-informed">informed</span> {% endif %}
+          {% if badge == "SHARP"    %}<span class="badge badge-sharp">sharp</span> {% endif %}
+          {% if badge == "FARMER"   %}<span class="badge badge-farmer">farmer</span> {% endif %}
+          {% if badge == "SYBIL"    %}<span class="badge badge-sybil">sybil</span> {% endif %}
+        {% endfor %}
+      </td>
+      <td>
+        {% if w.watch_status == "high-interest" %}
+          <span class="badge badge-high">high-interest</span>
+        {% elif w.watch_status == "watch" %}
+          <span class="badge badge-sent">watch</span>
+        {% elif w.watch_status == "ignore" %}
+          <span class="badge badge-unsent">ignore</span>
+        {% else %}
+          <span class="muted">—</span>
+        {% endif %}
+      </td>
+      <td>{{ w.markets_traded_count }}</td>
+      <td>{{ w.resolved_trades_count }}</td>
+      <td class="mono muted">{{ w.last_seen.strftime('%Y-%m-%d %H:%M') if w.last_seen else "—" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% if pagination.total_pages > 1 %}
+<div class="pager" style="margin-top:16px;justify-content:flex-end;">
+  {% if pagination.prev_url %}<a href="{{ pagination.prev_url }}">← Prev</a>{% else %}<span>← Prev</span>{% endif %}
+  <span style="background:none;border:none;color:#666;">Page {{ pagination.page }} / {{ pagination.total_pages }}</span>
+  {% if pagination.next_url %}<a href="{{ pagination.next_url }}">Next →</a>{% else %}<span>Next →</span>{% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<p class="empty">No wallets match the current filter. Try changing the period or clearing search.</p>
+{% endif %}
+
+{% endblock %}
